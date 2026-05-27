@@ -1,7 +1,6 @@
-:plugin: example
+:plugin: pulsar
 :type: output
-:default_codec: plain
-// Update header with plugin name and default codec
+:default_codec: java_line
 
 ///////////////////////////////////////////
 START - GENERATED VARIABLES, DO NOT EDIT!
@@ -16,110 +15,234 @@ END - GENERATED VARIABLES, DO NOT EDIT!
 
 [id="plugins-{type}s-{plugin}"]
 
-=== Example output plugin
+=== Pulsar output plugin
 
 include::{include_path}/plugin_header.asciidoc[]
 
 ==== Description
 
-Add plugin description here
+Write events to an Apache Pulsar topic. This plugin supports dynamic topic routing,
+TLS authentication, token-based authentication, configurable batching, message
+compression, retry with exponential backoff, automatic producer reconnection,
+and graceful shutdown with in-flight message draining.
 
-// Format anchors and links to support generated ids for versioning
-// Sample anchor: [id="plugins-{type}s-{plugin}-setting_name"]
-// Sample link: <<plugins-{type}s-{plugin}-setting_name>>
+Uses Apache Pulsar Client 3.3.4. For broker compatibility, see the
+https://pulsar.apache.org/docs/client-libraries/[official Pulsar client compatibility matrix].
 
 [id="plugins-{type}s-{plugin}-options"]
-==== Example Output Configuration Options
+==== Pulsar Output Configuration Options
 
-[cols="<,<,<",options="header",]
+[cols="<,<,<,<",options="header",]
 |=======================================================================
-|Setting |Input type|Required
-| <<plugins-{type}s-{plugin}-a_setting_name>> |<<boolean,boolean>>|No
-| <<plugins-{type}s-{plugin}-another_setting_name>> |<<hash,hash>>|No
-| <<plugins-{type}s-{plugin}-setting_name_3>> |<<string,string>>|No
-| <<plugins-{type}s-{plugin}-setting_name_4>> |<<number,number>>|No
-| <<plugins-{type}s-{plugin}-setting_name_5>> |<<array,array>>|No
-| <<plugins-{type}s-{plugin}-setting_name_6>> |<<bytes,bytes>>|No
-| <<plugins-{type}s-{plugin}-setting_name_7>> |<<path,path>>|No
-| <<plugins-{type}s-{plugin}-setting_name_8>> |<<password,password>>|No
-| <<plugins-{type}s-{plugin}-setting_name_9>> |<<uri,uri>>|No
+|Setting |Input type|Required|Default
+| <<plugins-{type}s-{plugin}-serviceUrl>> |<<string,string>>|No|`pulsar://localhost:6650`
+| <<plugins-{type}s-{plugin}-topic>> |<<string,string>>|Yes|
+| <<plugins-{type}s-{plugin}-producer_name>> |<<string,string>>|No|`logstash-pulsar`
+| <<plugins-{type}s-{plugin}-compression_type>> |<<string,string>>|No|`NONE`
+| <<plugins-{type}s-{plugin}-block_if_queue_full>> |<<boolean,boolean>>|No|`true`
+| <<plugins-{type}s-{plugin}-enable_batching>> |<<boolean,boolean>>|No|`true`
+| <<plugins-{type}s-{plugin}-send_timeout_ms>> |<<string,string>>|No|`30000`
+| <<plugins-{type}s-{plugin}-max_pending_messages>> |<<string,string>>|No|`1000`
+| <<plugins-{type}s-{plugin}-max_retries>> |<<string,string>>|No|`3`
+| <<plugins-{type}s-{plugin}-retry_initial_delay_ms>> |<<string,string>>|No|`100`
+| <<plugins-{type}s-{plugin}-retry_max_delay_ms>> |<<string,string>>|No|`10000`
+| <<plugins-{type}s-{plugin}-drain_timeout_ms>> |<<string,string>>|No|`30000`
+| <<plugins-{type}s-{plugin}-enable_tls>> |<<boolean,boolean>>|No|`false`
+| <<plugins-{type}s-{plugin}-tls_trust_store_path>> |<<string,string>>|No|
+| <<plugins-{type}s-{plugin}-tls_trust_store_password>> |<<string,string>>|No|
+| <<plugins-{type}s-{plugin}-enable_tls_hostname_verification>> |<<boolean,boolean>>|No|`false`
+| <<plugins-{type}s-{plugin}-allow_tls_insecure_connection>> |<<boolean,boolean>>|No|`false`
+| <<plugins-{type}s-{plugin}-protocols>> |<<array,array>>|No|`["TLSv1.2"]`
+| <<plugins-{type}s-{plugin}-ciphers>> |<<array,array>>|No|See description
+| <<plugins-{type}s-{plugin}-auth_plugin_class_name>> |<<string,string>>|No|`AuthenticationKeyStoreTls`
+| <<plugins-{type}s-{plugin}-enable_token>> |<<boolean,boolean>>|No|`false`
+| <<plugins-{type}s-{plugin}-auth_plugin_params_string>> |<<string,string>>|No|
 |=======================================================================
 
-[id="plugins-{type}s-{plugin}-a_setting_name"]
-===== `a_setting_name` 
+[id="plugins-{type}s-{plugin}-serviceUrl"]
+===== `serviceUrl`
+
+  * Value type is <<string,string>>
+  * Default value is `"pulsar://localhost:6650"`
+
+The Pulsar service URL. Use `pulsar://` for plain connections or `pulsar+ssl://` for TLS.
+
+[id="plugins-{type}s-{plugin}-topic"]
+===== `topic`
+
+  * Value type is <<string,string>>
+  * This is a required setting
+
+The Pulsar topic to publish to. Supports Logstash `sprintf` format for dynamic topic routing
+(e.g., `persistent://public/default/%{topic_name}`).
+
+[id="plugins-{type}s-{plugin}-producer_name"]
+===== `producer_name`
+
+  * Value type is <<string,string>>
+  * Default value is `"logstash-pulsar"`
+
+Base name for the Pulsar producer. A UUID suffix is appended to ensure uniqueness.
+
+[id="plugins-{type}s-{plugin}-compression_type"]
+===== `compression_type`
+
+  * Value type is <<string,string>>
+  * Default value is `"NONE"`
+
+Message compression type. Valid values: `NONE`, `LZ4`, `ZLIB`, `ZSTD`, `SNAPPY`.
+
+[id="plugins-{type}s-{plugin}-block_if_queue_full"]
+===== `block_if_queue_full`
 
   * Value type is <<boolean,boolean>>
   * Default value is `true`
 
-Add description here
+Whether `sendAsync` blocks when the outgoing message queue is full.
+When `true`, the producer blocks instead of failing immediately.
 
-[id="plugins-{type}s-{plugin}-another_setting_name"]
-===== `another_setting_name` 
+[id="plugins-{type}s-{plugin}-enable_batching"]
+===== `enable_batching`
 
-  * Value type is <<hash,hash>>
-  * Default value is `{}`
+  * Value type is <<boolean,boolean>>
+  * Default value is `true`
 
-Add description here
+Whether to enable message batching. Batching improves throughput at the cost of
+slight latency increase.
 
-[id="plugins-{type}s-{plugin}-setting_name_3"]
-===== `setting_name_3` 
+[id="plugins-{type}s-{plugin}-send_timeout_ms"]
+===== `send_timeout_ms`
+
+  * Value type is <<string,string>> (parsed as number)
+  * Default value is `"30000"`
+
+Send timeout in milliseconds. If a message is not acknowledged by the broker within
+this time, the send fails. Prevents indefinite blocking that can cause deadlocks.
+
+[id="plugins-{type}s-{plugin}-max_pending_messages"]
+===== `max_pending_messages`
+
+  * Value type is <<string,string>> (parsed as number)
+  * Default value is `"1000"`
+
+Maximum number of pending messages allowed in the producer's outgoing queue.
+
+[id="plugins-{type}s-{plugin}-max_retries"]
+===== `max_retries`
+
+  * Value type is <<string,string>> (parsed as number)
+  * Default value is `"3"`
+
+Maximum number of retry attempts for failed message sends. Uses exponential backoff
+between retries.
+
+[id="plugins-{type}s-{plugin}-retry_initial_delay_ms"]
+===== `retry_initial_delay_ms`
+
+  * Value type is <<string,string>> (parsed as number)
+  * Default value is `"100"`
+
+Initial delay in milliseconds before the first retry. Subsequent retries use
+exponential backoff (delay doubles each attempt) with 25% jitter.
+
+[id="plugins-{type}s-{plugin}-retry_max_delay_ms"]
+===== `retry_max_delay_ms`
+
+  * Value type is <<string,string>> (parsed as number)
+  * Default value is `"10000"`
+
+Maximum delay in milliseconds between retries. The exponential backoff is capped
+at this value.
+
+[id="plugins-{type}s-{plugin}-drain_timeout_ms"]
+===== `drain_timeout_ms`
+
+  * Value type is <<string,string>> (parsed as number)
+  * Default value is `"30000"`
+
+Maximum time in milliseconds to wait for in-flight async messages to complete
+during shutdown. After this timeout, the plugin proceeds with closing producers
+even if messages are still in-flight.
+
+[id="plugins-{type}s-{plugin}-enable_tls"]
+===== `enable_tls`
+
+  * Value type is <<boolean,boolean>>
+  * Default value is `false`
+
+Enable TLS keystore-based authentication. Cannot be used together with `enable_token`.
+
+[id="plugins-{type}s-{plugin}-tls_trust_store_path"]
+===== `tls_trust_store_path`
 
   * Value type is <<string,string>>
-  * Default value is `{}`
+  * Default value is `""`
 
-Add description here
+Path to the JKS trust store file. Required when `enable_tls` is `true`.
 
-[id="plugins-{type}s-{plugin}-setting_name_4"]
-===== `setting_name_4` 
+[id="plugins-{type}s-{plugin}-tls_trust_store_password"]
+===== `tls_trust_store_password`
 
-  * Value type is <<number,number>>
-  * Default value is `0`
+  * Value type is <<string,string>>
+  * Default value is `""`
 
-Add description here
+Password for the JKS trust store.
 
-[id="plugins-{type}s-{plugin}-setting_name_5"]
-===== `setting_name_5` 
+[id="plugins-{type}s-{plugin}-enable_tls_hostname_verification"]
+===== `enable_tls_hostname_verification`
+
+  * Value type is <<boolean,boolean>>
+  * Default value is `false`
+
+Whether to verify the broker's hostname against the TLS certificate.
+
+[id="plugins-{type}s-{plugin}-allow_tls_insecure_connection"]
+===== `allow_tls_insecure_connection`
+
+  * Value type is <<boolean,boolean>>
+  * Default value is `false`
+
+Allow insecure TLS connections (skip certificate verification). Not recommended for production.
+
+[id="plugins-{type}s-{plugin}-protocols"]
+===== `protocols`
 
   * Value type is <<array,array>>
-  * Default value is {}
+  * Default value is `["TLSv1.2"]`
 
-Add description here
+List of TLS protocols to allow.
 
-[id="plugins-{type}s-{plugin}-setting_name_6"]
-===== `setting_name_6` 
+[id="plugins-{type}s-{plugin}-ciphers"]
+===== `ciphers`
 
-  * Value type is <<bytes,bytes>>
-  * Default value is {}
+  * Value type is <<array,array>>
+  * Default value includes `TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256`, `TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384`, `TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256`, `TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384`
 
-Add description here
+List of TLS cipher suites to allow.
 
-[id="plugins-{type}s-{plugin}-setting_name_7"]
-===== `setting_name_7` 
+[id="plugins-{type}s-{plugin}-auth_plugin_class_name"]
+===== `auth_plugin_class_name`
 
-  * Value type is <<path,path>>
-  * Default value is {}
+  * Value type is <<string,string>>
+  * Default value is `"org.apache.pulsar.client.impl.auth.AuthenticationKeyStoreTls"`
 
-Add description here
+Fully-qualified class name of the Pulsar authentication plugin.
 
-[id="plugins-{type}s-{plugin}-setting_name_8"]
-===== `setting_name_8` 
+[id="plugins-{type}s-{plugin}-enable_token"]
+===== `enable_token`
 
-  * Value type is <<password,password>>
-  * Default value is {}
+  * Value type is <<boolean,boolean>>
+  * Default value is `false`
 
-Add description here
+Enable token-based authentication. Cannot be used together with `enable_tls`.
 
+[id="plugins-{type}s-{plugin}-auth_plugin_params_string"]
+===== `auth_plugin_params_string`
 
-[id="plugins-{type}s-{plugin}-setting_name_9"]
-===== `setting_name_9` 
+  * Value type is <<string,string>>
+  * Default value is `""`
 
-  * Value type is <<uri,uri>>
-  * Default value is {}
-
-Add description here
-
-// The full list of Value Types is here: 
-// https://www.elastic.co/guide/en/logstash/current/configuration-file-structure.html
+Authentication parameters string (e.g., `token:your-jwt-token`). Used with token authentication.
 
 [id="plugins-{type}s-{plugin}-common-options"]
 include::{include_path}/{type}.asciidoc[]

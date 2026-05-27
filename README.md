@@ -1,71 +1,146 @@
 # Logstash Output Pulsar Plugin
 
-This is a Java plugin for [Logstash](https://github.com/elastic/logstash).
+This is a Java plugin for [Logstash](https://github.com/elastic/logstash) that writes events to [Apache Pulsar](https://pulsar.apache.org/) topics.
 
 It is fully free and fully open source. The license is Apache 2.0, meaning you are free to use it however you want.
 
-Write events to a pulsar topic.
+## Features
 
-This plugin uses Pulsar Client 2.9.0. For broker compatibility, see the official Pulsar compatibility reference. If the compatibility wiki is not up-to-date, please contact Pulsar support/community to confirm compatibility.
+- Async message publishing with configurable send timeout
+- Dynamic topic routing via Logstash `sprintf` format
+- Retry with exponential backoff and jitter for transient failures
+- Automatic producer reconnection on disconnect
+- Graceful shutdown with in-flight message draining
+- TLS keystore authentication
+- Token-based authentication (JWT)
+- Message compression (LZ4, ZLIB, ZSTD, SNAPPY)
+- Configurable batching
 
-If you require features not yet available in this plugin (including client version upgrades), please file an issue with details about what you need.
+This plugin uses **Pulsar Client 3.3.4**. For broker compatibility, see the [official Pulsar compatibility matrix](https://pulsar.apache.org/docs/client-libraries/).
 
-# Pulsar Output Configuration Options
-This plugin supports these configuration options. 
+## Configuration Options
 
-| Settings                          |                                  Output type                                  |   Required |
-|-----------------------------------|:-----------------------------------------------------------------------------:|-----------:|
-| serviceUrl                        |                                    string                                     |         No |
-| topic                             |                                    string                                     |        Yes |
-| producer_name                     |                                    string                                     |        Yes |
-| compression_type                  |              string, one of["NONE","LZ4","ZLIB","ZSTD","SNAPPY"]              |         No |
-| block_if_queue_full               |                             bool, default is true                             |         No |
-| enable_batching                   |                             bool, default is true                             |         No |
-| enable_tls                        |                boolean, one of [true, false]. default is false                |         No |
-| tls_trust_store_path              |                 string, required if enable_tls is set to true                 |         No |
-| tls_trust_store_password          |                           string, default is empty                            |         No |
-| enable_tls_hostname_verification  |                boolean, one of [true, false]. default is false                |         No |
-| protocols                         |                    array, ciphers list. default is TLSv1.2                    |         No |
-| allow_tls_insecure_connection     |                boolean, one of [true, false].default is false                 |         No |
-| auth_plugin_class_name            |                                    string                                     |         No |
-| ciphers                           |                              array, ciphers list                              |         No |
-| enable_token                      |                boolean, one of [true, false]. default is false                |         No |
-| auth_plugin_params_String         |                                    string                                     |         No |
-# Example
-pulsar without tls & token 
-```
-output{
-  pulsar{
+| Setting | Type | Required | Default |
+|---|:---:|:---:|---:|
+| `serviceUrl` | string | No | `pulsar://localhost:6650` |
+| `topic` | string | **Yes** | |
+| `producer_name` | string | No | `logstash-pulsar` |
+| `compression_type` | string | No | `NONE` |
+| `block_if_queue_full` | boolean | No | `true` |
+| `enable_batching` | boolean | No | `true` |
+| `send_timeout_ms` | string | No | `30000` |
+| `max_pending_messages` | string | No | `1000` |
+| `max_retries` | string | No | `3` |
+| `retry_initial_delay_ms` | string | No | `100` |
+| `retry_max_delay_ms` | string | No | `10000` |
+| `drain_timeout_ms` | string | No | `30000` |
+| `enable_tls` | boolean | No | `false` |
+| `tls_trust_store_path` | string | No | |
+| `tls_trust_store_password` | string | No | |
+| `enable_tls_hostname_verification` | boolean | No | `false` |
+| `allow_tls_insecure_connection` | boolean | No | `false` |
+| `protocols` | array | No | `["TLSv1.2"]` |
+| `ciphers` | array | No | (see docs) |
+| `auth_plugin_class_name` | string | No | `AuthenticationKeyStoreTls` |
+| `enable_token` | boolean | No | `false` |
+| `auth_plugin_params_string` | string | No | |
+
+### Retry & Resilience Settings
+
+| Setting | Description |
+|---|---|
+| `max_retries` | Number of retry attempts per message on transient failure (exponential backoff) |
+| `retry_initial_delay_ms` | Initial retry delay; doubles each attempt with 25% jitter |
+| `retry_max_delay_ms` | Cap on retry delay |
+| `drain_timeout_ms` | Max time to wait for in-flight messages during shutdown |
+| `send_timeout_ms` | Per-message send timeout; prevents deadlocks from indefinite blocking |
+
+## Examples
+
+### Basic (no auth)
+
+```ruby
+output {
+  pulsar {
     serviceUrl => "pulsar://127.0.0.1:6650"
     topic => "persistent://public/default/%{topic_name}"
-    producer_name => "%{producer_name}"
+    producer_name => "my-logstash"
     enable_batching => true
+    compression_type => "LZ4"
   }
 }
 ```
-pulsar with token
-```
+
+### With retry tuning
+
+```ruby
 output {
-  pulsar{
+  pulsar {
+    serviceUrl => "pulsar://127.0.0.1:6650"
+    topic => "persistent://public/default/logs"
+    max_retries => "5"
+    retry_initial_delay_ms => "200"
+    retry_max_delay_ms => "30000"
+    drain_timeout_ms => "60000"
+    send_timeout_ms => "60000"
+  }
+}
+```
+
+### With token authentication
+
+```ruby
+output {
+  pulsar {
     serviceUrl => "pulsar://localhost:6650"
     topic => "persistent://public/default/%{topic_name}"
-    producer_name => "%{producer_name}"
     enable_batching => true
     enable_token => true
     auth_plugin_class_name => "org.apache.pulsar.client.impl.auth.AuthenticationToken"
-    auth_plugin_params_String => "token:%{token}"
+    auth_plugin_params_string => "token:eyJhbGciOi..."
   }
 }
 ```
 
+### With TLS keystore authentication
 
-# Installation
-
-1. Get the latest zip file from release page.
-https://github.com/streamnative/logstash-output-pulsar/releases
-
-2. Install this plugin using logstash preoffline command.
-
+```ruby
+output {
+  pulsar {
+    serviceUrl => "pulsar+ssl://pulsar.example.com:6651"
+    topic => "persistent://tenant/namespace/topic"
+    enable_tls => true
+    tls_trust_store_path => "/etc/pki/pulsar-truststore.jks"
+    tls_trust_store_password => "changeit"
+    enable_tls_hostname_verification => true
+  }
+}
 ```
-bin/logstash-plugin install file://{PATH_TO}/logstash-output-pulsar-2.10.0.0.zip
+
+## Building
+
+Requires Logstash 7.17.x installed (for `logstash-core.jar`).
+
+```bash
+# Default: expects Logstash at /usr/share/logstash
+./gradlew build
+
+# Custom Logstash path:
+./gradlew build -PLOGSTASH_PATH=/opt/logstash
 ```
+
+The fat JAR is produced at `build/libs/logstash-output-pulsar-<version>.jar`.
+
+## Installation
+
+1. Build the plugin or download the latest release from the [releases page](https://github.com/streamnative/logstash-output-pulsar/releases).
+
+2. Install using the Logstash plugin manager:
+
+```bash
+bin/logstash-plugin install file:///path/to/logstash-output-pulsar-<version>.zip
+```
+
+## License
+
+Apache License 2.0
