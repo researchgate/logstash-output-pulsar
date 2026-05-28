@@ -1,7 +1,31 @@
 import java.nio.file.Files
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING
 
-apply plugin: 'java'
+buildscript {
+    repositories {
+        mavenCentral()
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath "org.yaml:snakeyaml:2.2"
+    }
+}
+
+plugins {
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
+    id 'java'
+}
+
+ext {
+    shadowGradlePluginVersion = '7.1.2'
+}
+
+// load versions.yml from core before loading rubyUtils.gradle
+import org.yaml.snakeyaml.Yaml
+def versionsFile = file(LOGSTASH_CORE_PATH + "/../versions.yml")
+gradle.ext.versions = new Yaml().load(versionsFile.text)
+
+apply from: LOGSTASH_CORE_PATH + "/../rubyUtils.gradle"
 
 // ===========================================================================
 // plugin info
@@ -9,6 +33,14 @@ apply plugin: 'java'
 group                      'org.apache.pulsar.logstash.outputs' // must match the package of the main plugin class
 version                    "${file("VERSION").text.trim()}" // read from required VERSION file
 description                = "Logstash Pulsar output implementation"
+pluginInfo.licenses        = ['Apache-2.0'] // list of SPDX license IDs
+pluginInfo.longDescription = "This gem is a Logstash plugin required to be installed on top of the Logstash core pipeline using \$LS_HOME/bin/logstash-plugin install gemname. This gem is not a stand-alone program"
+pluginInfo.authors         = ['Elasticsearch']
+pluginInfo.email           = ['info@elastic.co']
+pluginInfo.homepage        = "http://www.elastic.co/guide/en/logstash/current/index.html"
+pluginInfo.pluginType      = "output"
+pluginInfo.pluginClass     = "Pulsar"
+pluginInfo.pluginName      = "pulsar" // must match the @LogstashPlugin annotation in the main plugin class
 // ===========================================================================
 
 java {
@@ -17,131 +49,70 @@ java {
     }
 }
 
-buildscript {
-    repositories {
-        mavenCentral()
-        gradlePluginPortal()
-    }
-
-    dependencies {
-        classpath 'gradle.plugin.com.github.johnrengelman:shadow:7.1.2'
-    }
-}
-
 repositories {
     mavenCentral()
 }
 
-apply plugin: 'com.github.johnrengelman.shadow'
-
 shadowJar {
-    exclude "**/Log4j2Plugins.dat"
-    archiveClassifier = null
-}
-
-// Locate logstash-core JAR from Logstash installation.
-// Set via: ./gradlew build -PLOGSTASH_PATH=/usr/share/logstash
-// Or in gradle.properties: LOGSTASH_PATH=/usr/share/logstash
-if (!project.hasProperty("LOGSTASH_PATH")) {
-    // Also accept the legacy LOGSTASH_CORE_PATH for backward compat
-    if (project.hasProperty("LOGSTASH_CORE_PATH")) {
-        ext.LOGSTASH_PATH = file(LOGSTASH_CORE_PATH + "/..").absolutePath
-    } else {
-        ext.LOGSTASH_PATH = "/usr/share/logstash"
-    }
-}
-
-// Look for logstash-core.jar in the installation layout first, then source-tree layout
-def logstashCoreJar = file("${LOGSTASH_PATH}/logstash-core/lib/jars/logstash-core.jar")
-if (!logstashCoreJar.exists()) {
-    def candidates = fileTree(dir: "${LOGSTASH_PATH}/logstash-core/build/libs", include: "logstash-core-*.jar")
-    if (!candidates.isEmpty()) {
-        logstashCoreJar = candidates.singleFile
-    } else {
-        throw new GradleException(
-            "Could not find logstash-core.jar. Set LOGSTASH_PATH to your Logstash installation directory.\n" +
-            "  Searched: ${LOGSTASH_PATH}/logstash-core/lib/jars/logstash-core.jar\n" +
-            "  Example:  ./gradlew build -PLOGSTASH_PATH=/usr/share/logstash")
-    }
+    archiveClassifier.set('')
 }
 
 dependencies {
-    implementation 'org.apache.logging.log4j:log4j-core:2.23.1'
     implementation 'org.apache.logging.log4j:log4j-api:2.23.1'
     implementation 'org.apache.pulsar:pulsar-client:4.0.9'
-    compileOnly files(logstashCoreJar)
+    implementation fileTree(dir: LOGSTASH_CORE_PATH, include: "**/logstash-core.jar")
 
-    testImplementation files(logstashCoreJar)
-    testImplementation 'com.fasterxml.jackson.core:jackson-databind:2.17.2'
-    testImplementation 'com.fasterxml.jackson.dataformat:jackson-dataformat-cbor:2.17.2'
     testImplementation 'junit:junit:4.13.2'
-    testImplementation 'org.jruby:jruby-complete:9.4.8.0'
+    testImplementation "org.jruby:jruby-complete:${gradle.ext.versions.jruby.version}"
+    testImplementation 'org.apache.logging.log4j:log4j-core:2.23.1'
 }
 
 clean {
     delete "${projectDir}/Gemfile"
+    delete "${projectDir}/" + pluginInfo.pluginFullName() + ".gemspec"
     delete "${projectDir}/lib/"
     delete "${projectDir}/vendor/"
+    new FileNameFinder().getFileNames(projectDir.toString(), pluginInfo.pluginFullName() + "-?.?.?.gem").each { filename ->
+        delete filename
+    }
 }
 
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'
 }
 
-tasks.register("vendor") {
+tasks.register("vendor"){
     dependsOn shadowJar
     doLast {
         String vendorPathPrefix = "vendor/jar-dependencies"
         String projectGroupPath = project.group.replaceAll('\\.', '/')
-        String pluginFullName = "logstash-output-pulsar"
-        File projectJarFile = file("${vendorPathPrefix}/${projectGroupPath}/${pluginFullName}/${project.version}/${pluginFullName}-${project.version}.jar")
-        projectJarFile.parentFile.mkdirs()
-        Files.copy(file("${buildDir}/libs/${project.name}-${project.version}.jar").toPath(), projectJarFile.toPath(), REPLACE_EXISTING)
+        File projectJarFile = file("${vendorPathPrefix}/${projectGroupPath}/${pluginInfo.pluginFullName()}/${project.version}/${pluginInfo.pluginFullName()}-${project.version}.jar")
+        projectJarFile.mkdirs()
+        Files.copy(file("$buildDir/libs/${project.name}-${project.version}.jar").toPath(), projectJarFile.toPath(), REPLACE_EXISTING)
+        validatePluginJar(projectJarFile, project.group)
     }
 }
 
-// Gem-related tasks require LOGSTASH_CORE_PATH and rubyUtils.gradle from the Logstash source tree.
-// Usage: ./gradlew gem -PLOGSTASH_CORE_PATH=/path/to/logstash
-if (project.hasProperty("LOGSTASH_CORE_PATH")) {
-    apply from: LOGSTASH_CORE_PATH + "/../rubyUtils.gradle"
+tasks.register("generateRubySupportFiles") {
+    doLast {
+        generateRubySupportFilesForPlugin(project.description, project.group, version)
+    }
+}
 
-    pluginInfo.licenses        = ['Apache-2.0']
-    pluginInfo.longDescription = "This gem is a Logstash plugin required to be installed on top of the Logstash core pipeline using \$LS_HOME/bin/logstash-plugin install gemname. This gem is not a stand-alone program"
-    pluginInfo.authors         = ['@rockybean']
-    pluginInfo.email           = ['weibinway@gmail.com']
-    pluginInfo.homepage        = "https://github.com/apache/pulsar-logstash-plugin"
-    pluginInfo.pluginType      = "output"
-    pluginInfo.pluginClass     = "Pulsar"
-    pluginInfo.pluginName      = "pulsar"
-
-    clean {
-        delete "${projectDir}/" + pluginInfo.pluginFullName() + ".gemspec"
-        new FileNameFinder().getFileNames(projectDir.toString(), pluginInfo.pluginFullName() + "-?.?.?.gem").each { filename ->
-            delete filename
+tasks.register("removeObsoleteJars") {
+    doLast {
+        new FileNameFinder().getFileNames(
+                projectDir.toString(),
+                "vendor/**/" + pluginInfo.pluginFullName() + "*.jar",
+                "vendor/**/" + pluginInfo.pluginFullName() + "-" + version + ".jar").each { f ->
+            delete f
         }
     }
+}
 
-    tasks.register("generateRubySupportFiles") {
-        doLast {
-            generateRubySupportFilesForPlugin(project.description, project.group, version)
-        }
-    }
-
-    tasks.register("removeObsoleteJars") {
-        doLast {
-            new FileNameFinder().getFileNames(
-                    projectDir.toString(),
-                    "vendor/**/" + pluginInfo.pluginFullName() + "*.jar",
-                    "vendor/**/" + pluginInfo.pluginFullName() + "-" + version + ".jar").each { f ->
-                delete f
-            }
-        }
-    }
-
-    tasks.register("gem") {
-        dependsOn([downloadAndInstallJRuby, removeObsoleteJars, vendor, generateRubySupportFiles])
-        doLast {
-            buildGem(projectDir, buildDir, pluginInfo.pluginFullName() + ".gemspec")
-        }
+tasks.register("gem"){
+    dependsOn = [downloadAndInstallJRuby, removeObsoleteJars, vendor, generateRubySupportFiles]
+    doLast {
+        buildGem(projectDir, buildDir, pluginInfo.pluginFullName() + ".gemspec")
     }
 }
