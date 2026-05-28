@@ -16,7 +16,7 @@ It is fully free and fully open source. The license is Apache 2.0, meaning you a
 - Message compression (LZ4, ZLIB, ZSTD, SNAPPY)
 - Configurable batching
 
-This plugin uses **Pulsar Client 3.3.4**. For broker compatibility, see the [official Pulsar compatibility matrix](https://pulsar.apache.org/docs/client-libraries/).
+This plugin uses **Pulsar Client 4.0.9**. For broker compatibility, see the [official Pulsar compatibility matrix](https://pulsar.apache.org/docs/client-libraries/).
 
 ## Configuration Options
 
@@ -122,23 +122,24 @@ output {
 Requires Logstash 7.17.x installed (for `logstash-core.jar`).
 
 ```bash
-# Default: expects Logstash at /usr/share/logstash
-./gradlew build
+# Clone Logstash and build the core JAR
+git clone https://github.com/elastic/logstash.git
+cd logstash
+git checkout tags/v7.17.6
+./gradlew assemble
 
-# Custom Logstash path:
-./gradlew build -PLOGSTASH_PATH=/opt/logstash
+# In root of this repo:
+./gradlew gem -PLOGSTASH_CORE_PATH=../logstash/logstash-core
 ```
 
-The fat JAR is produced at `build/libs/logstash-output-pulsar-<version>.jar`.
+The result is `logstash-output-pulsar-<version>.gem`.
 
 ## Installation
 
-1. Build the plugin or download the latest release from the [releases page](https://github.com/streamnative/logstash-output-pulsar/releases).
-
-2. Install using the Logstash plugin manager:
+1. Install using the Logstash plugin manager:
 
 ```bash
-bin/logstash-plugin install file:///path/to/logstash-output-pulsar-<version>.zip
+/usr/share/logstash/bin/logstash-plugin install --no-verify --local logstash-output-pulsar-<version>.gem
 ```
 
 ## License
