@@ -26,7 +26,7 @@ TLS authentication, token-based authentication, configurable batching, message
 compression, retry with exponential backoff, automatic producer reconnection,
 and graceful shutdown with in-flight message draining.
 
-Uses Apache Pulsar Client 3.3.4. For broker compatibility, see the
+Uses Apache Pulsar Client 4.0.9. For broker compatibility, see the
 https://pulsar.apache.org/docs/client-libraries/[official Pulsar client compatibility matrix].
 
 [id="plugins-{type}s-{plugin}-options"]
