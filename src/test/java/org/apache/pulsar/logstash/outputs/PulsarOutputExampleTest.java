@@ -29,7 +29,7 @@ public class PulsarOutputExampleTest {
         configValues.put("enable_batching", true);
         configValues.put("enable_token", true);
         configValues.put("auth_plugin_class_name", "org.apache.pulsar.client.impl.auth.AuthenticationToken");
-        configValues.put("auth_plugin_params_String", "token:" + token);
+        configValues.put("auth_plugin_params_string", "token:" + token);
         String delimiter = "/";
         Map<String, Object> codecMap = new HashMap<>();
         codecMap.put("delimiter", delimiter);
