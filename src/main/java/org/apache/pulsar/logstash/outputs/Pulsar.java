@@ -142,6 +142,8 @@ public class Pulsar implements Output {
     private final long sendTimeoutMs;
     private final int maxPendingMessages;
     private final boolean enableTls;
+    private final boolean allowTlsInsecureConnection;
+    private final boolean enableTlsHostnameVerification;
     private final boolean enableToken;
 
     // Retry settings
@@ -180,6 +182,8 @@ public class Pulsar implements Output {
         drainTimeoutMs = Long.parseLong(configuration.get(CONFIG_DRAIN_TIMEOUT_MS));
 
         enableTls = configuration.get(CONFIG_ENABLE_TLS);
+        allowTlsInsecureConnection = configuration.get(CONFIG_ALLOW_TLS_INSECURE_CONNECTION);
+        enableTlsHostnameVerification = configuration.get(CONFIG_ENABLE_TLS_HOSTNAME_VERIFICATION);
         enableToken = configuration.get(CONFIG_ENABLE_TOKEN);
 
         try {
@@ -209,12 +213,16 @@ public class Pulsar implements Output {
     private PulsarClient buildNotTlsPulsar() throws PulsarClientException {
         return PulsarClient.builder()
                 .serviceUrl(serviceUrl)
+                .allowTlsInsecureConnection(allowTlsInsecureConnection)
+                .enableTlsHostnameVerification(enableTlsHostnameVerification)
                 .build();
     }
 
     private PulsarClient buildTokenPulsar(Configuration configuration) throws PulsarClientException {
         return PulsarClient.builder()
                 .serviceUrl(serviceUrl)
+                .allowTlsInsecureConnection(allowTlsInsecureConnection)
+                .enableTlsHostnameVerification(enableTlsHostnameVerification)
                 .authentication(
                         configuration.get(CONFIG_AUTH_PLUGIN_CLASS_NAME),
                         configuration.get(CONFIG_AUTH_PLUGIN_PARAMS_STRING))
@@ -222,8 +230,6 @@ public class Pulsar implements Output {
     }
 
     private PulsarClient buildTlsPulsar(Configuration configuration) throws PulsarClientException {
-        Boolean allowTlsInsecureConnection = configuration.get(CONFIG_ALLOW_TLS_INSECURE_CONNECTION);
-        Boolean enableTlsHostnameVerification = configuration.get(CONFIG_ENABLE_TLS_HOSTNAME_VERIFICATION);
         String tlsTrustStorePath = configuration.get(CONFIG_TLS_TRUST_STORE_PATH);
         Map<String, String> authMap = new HashMap<>();
         authMap.put(AuthenticationKeyStoreTls.KEYSTORE_TYPE, "JKS");
